@@ -1,0 +1,7 @@
+# Cloudflare
+.wrangler
+.dev.vars
+node_modules
+
+# WorkBuddy 项目记忆（非缓存，不进仓库）
+.workbuddy

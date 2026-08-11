@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>私密分享站</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-neutral-950 text-white">
+  <div id="app"></div>
+  <script>
+    const RESOURCES = {
+      "1": {
+        name: "边玩边赚公众号",
+        title: "边玩边赚公众号游戏分享",
+        prompt: "密码请前往边玩边赚公众号获取",
+        link: "https://mp.weixin.qq.com/s/rzXISAZJSnlEqGWSmPxo_g",
+        linkText: "前往「边玩边赚」公众号获取密码",
+        qr: "/qrcode.png",
+        qrAlt: "边玩边赚公众号二维码",
+      },
+      "2": {
+        name: "得劲滋润爽的B站",
+        title: "得劲滋润爽的B站资源分享",
+        prompt: "请前往UP主私信获取密码",
+        link: "https://space.bilibili.com/34305728",
+        linkText: "前往UP主空间私信获取密码",
+        qr: "/bilibili.png",
+        qrAlt: "得劲滋润爽的B站UP主空间二维码",
+      },
+    };
+    const app = document.getElementById("app");
+    let resource = null, authed = false, password = "", error = "", items = [], fetching = false, loading = false;
+
+    const fmtDate = (ts) =>
+      new Date(ts).toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+    const esc = (s) =>
+      String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+      );
+
+    async function fetchContent(resId, code) {
+      fetching = true; render();
+      try {
+        const res = await fetch("/api/content?resource=" + resId, { headers: { "X-Access-Code": code } });
+        if (res.ok) {
+          const data = await res.json();
+          items = data.items || [];
+          authed = true;
+          sessionStorage.setItem("share_access", JSON.stringify({ resource: resId, code }));
+        } else {
+          sessionStorage.removeItem("share_access");
+          authed = false;
+        }
+      } catch (e) {
+        error = "网络错误，请稍后重试";
+      }
+      fetching = false; render();
+    }
+
+    function selectResource(id) {
+      resource = id; password = ""; error = ""; authed = false; items = []; render();
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      if (!password.trim() || !resource) return;
+      loading = true; error = ""; render();
+      try {
+        const res = await fetch("/api/auth/visitor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resource, password }),
+        });
+        if (res.ok) {
+          await fetchContent(resource, password);
+        } else {
+          const d = await res.json().catch(() => ({}));
+          error = d.error || "密码错误，请重试";
+        }
+      } catch (err) {
+        error = "网络错误，请稍后重试";
+      }
+      loading = false; render();
+    }
+
+    function back() {
+      sessionStorage.removeItem("share_access");
+      resource = null; authed = false; password = ""; items = []; error = ""; render();
+    }
+
+    function render() {
+      let html = "";
+      if (!resource) {
+        html = `<main class="min-h-screen flex items-center justify-center bg-neutral-950 px-4"><div class="w-full max-w-md">
+          <h1 class="text-xl font-semibold text-white text-center mb-2">请选择你要获取资源的账号</h1>
+          <p class="text-sm text-neutral-400 text-center mb-8">选择后输入对应密码查看分享内容</p>
+          <div class="space-y-4">
+          ${Object.entries(RESOURCES).map(([id, r]) => `<button onclick="selectResource('${id}')" class="w-full flex items-center gap-4 px-5 py-5 rounded-2xl bg-neutral-900 border border-neutral-800 text-left hover:border-neutral-500 hover:bg-neutral-800 transition-colors">
+            <div class="w-11 h-11 rounded-xl bg-neutral-800 flex items-center justify-center shrink-0"><i data-lucide="user" class="w-5 h-5 text-neutral-300"></i></div>
+            <div class="min-w-0"><div class="font-medium text-white">${esc(r.name)}</div><div class="text-xs text-neutral-500 mt-0.5 truncate">${esc(r.title)}</div></div>
+          </button>`).join("")}
+          </div></div></main>`;
+      } else if (!authed) {
+        const cfg = RESOURCES[resource];
+        html = `<main class="min-h-screen flex items-center justify-center bg-neutral-950 px-4"><div class="w-full max-w-sm">
+          <div class="flex flex-col items-center mb-8">
+            <div class="w-14 h-14 rounded-2xl bg-neutral-800 flex items-center justify-center mb-4"><i data-lucide="lock" class="w-6 h-6 text-neutral-300"></i></div>
+            <h1 class="text-xl font-semibold text-white text-center">${esc(cfg.title)}</h1>
+            <p class="text-sm text-neutral-400 mt-2 text-center">${esc(cfg.prompt)}</p>
+          </div>
+          <form onsubmit="handleLogin(event)" class="space-y-4">
+            <input type="password" value="${esc(password)}" oninput="password=this.value" placeholder="访问密码" autofocus class="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400 transition-colors"/>
+            ${error ? `<p class="text-sm text-red-400">${esc(error)}</p>` : ""}
+            <button type="submit" ${loading || fetching ? "disabled" : ""} class="w-full py-3 rounded-xl bg-white text-neutral-900 font-medium hover:bg-neutral-200 disabled:opacity-50 transition-colors">${loading || fetching ? "验证中..." : "进入"}</button>
+          </form>
+          <div class="mt-6 w-full text-center space-y-3">
+            <a href="${esc(cfg.link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300">${esc(cfg.linkText)} <i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>
+            <div class="flex justify-center"><img src="${esc(cfg.qr)}" alt="${esc(cfg.qrAlt)}" class="w-40 h-40 rounded-xl border border-neutral-800 bg-white p-1"/></div>
+          </div>
+          <button onclick="back()" class="mt-4 w-full text-center text-xs text-neutral-500 hover:text-neutral-300 transition-colors">返回，选择其他账号</button>
+        </div></main>`;
+      } else {
+        const cfg = RESOURCES[resource];
+        html = `<main class="min-h-screen bg-neutral-950 text-white">
+          <header class="border-b border-neutral-800"><div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+            <h1 class="text-lg font-semibold">${esc(cfg.title)}</h1>
+            <button onclick="back()" class="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</button>
+          </div></header>
+          <div class="max-w-2xl mx-auto px-4 py-8 space-y-4">
+            ${items.length === 0 ? '<p class="text-center text-neutral-500 py-16">暂无分享内容</p>' : ""}
+            ${items.map((item) => `<div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                  ${item.type === "link" ? '<i data-lucide="link" class="w-4 h-4 text-blue-400 shrink-0"></i>' : '<i data-lucide="file-text" class="w-4 h-4 text-emerald-400 shrink-0"></i>'}
+                  <h2 class="font-medium truncate">${esc(item.title)}</h2>
+                </div>
+                <span class="text-xs text-neutral-500 shrink-0">${fmtDate(item.createdAt)}</span>
+              </div>
+              ${item.content ? `<p class="mt-3 text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed">${esc(item.content)}</p>` : ""}
+              ${item.type === "link" && item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 break-all">${esc(item.url)} <i data-lucide="external-link" class="w-3.5 h-3.5 shrink-0"></i></a>` : ""}
+            </div>`).join("")}
+          </div>
+        </main>`;
+      }
+      app.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    const saved = sessionStorage.getItem("share_access");
+    if (saved) {
+      try {
+        const o = JSON.parse(saved);
+        resource = o.resource;
+        fetchContent(o.resource, o.code);
+      } catch (e) {
+        sessionStorage.removeItem("share_access");
+        render();
+      }
+    } else {
+      render();
+    }
+  </script>
+</body>
+</html>

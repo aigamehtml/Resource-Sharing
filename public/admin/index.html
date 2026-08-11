@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>管理后台 · 私密分享站</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-neutral-950 text-white">
+  <div id="app"></div>
+  <script>
+    const RESOURCE_NAMES = { "1": "边玩边赚公众号", "2": "得劲滋润爽的B站" };
+    const app = document.getElementById("app");
+    let authed = false, adminCode = "", password = "", error = "", loading = false;
+    let resTab = "1", tab = "content", items = [], msg = "";
+    let newTitle = "", newContent = "", submitting = false, visitorPwd = "", adminPwd = "";
+
+    const esc = (s) =>
+      String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+      );
+
+    function flash(t) {
+      msg = t; render();
+      setTimeout(() => { msg = ""; if (authed) render(); }, 2500);
+    }
+
+    async function fetchItems(code, resId) {
+      const res = await fetch("/api/content?resource=" + resId, { headers: { "X-Admin-Code": code } });
+      if (res.ok) {
+        const d = await res.json();
+        items = d.items || [];
+        return true;
+      }
+      return false;
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      if (!password.trim()) return;
+      loading = true; error = ""; render();
+      try {
+        const res = await fetch("/api/auth/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+        if (res.ok) {
+          adminCode = password;
+          sessionStorage.setItem("admin_code", password);
+          await fetchItems(password, resTab);
+          authed = true;
+        } else {
+          let m = "管理密码错误";
+          try { const d = await res.json(); if (d && d.error) m = d.error; } catch (_) {}
+          error = m;
+        }
+      } catch (_) {
+        error = "网络错误，请稍后重试";
+      }
+      loading = false; render();
+    }
+
+    function handleLogout() {
+      sessionStorage.removeItem("admin_code");
+      authed = false; adminCode = ""; password = ""; render();
+    }
+
+    async function handleAdd(e) {
+      e.preventDefault();
+      submitting = true; render();
+      try {
+        const res = await fetch("/api/admin/content", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Admin-Code": adminCode },
+          body: JSON.stringify({ resource: resTab, type: "text", title: newTitle, content: newContent }),
+        });
+        const d = await res.json();
+        if (res.ok) {
+          newTitle = ""; newContent = "";
+          await fetchItems(adminCode, resTab);
+          flash("添加成功");
+        } else {
+          flash(d.error || "添加失败");
+        }
+      } catch (_) {
+        flash("网络错误");
+      }
+      submitting = false; render();
+    }
+
+    async function handleDelete(id) {
+      if (!confirm("确定删除这条内容吗？")) return;
+      const res = await fetch("/api/admin/content/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Code": adminCode },
+        body: JSON.stringify({ resource: resTab, id }),
+      });
+      if (res.ok) {
+        items = items.filter((it) => it.id !== id);
+        flash("已删除");
+      } else {
+        flash("删除失败");
+      }
+    }
+
+    async function handleChangePassword(which) {
+      const value = which === "visitor" ? visitorPwd : adminPwd;
+      if (!value.trim()) return;
+      const body = which === "visitor"
+        ? { resource: resTab, visitorPassword: value }
+        : { adminPassword: value };
+      const res = await fetch("/api/admin/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Code": adminCode },
+        body: JSON.stringify(body),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        if (which === "admin") { adminCode = value; sessionStorage.setItem("admin_code", value); }
+        visitorPwd = ""; adminPwd = "";
+        flash(which === "visitor" ? "访问密码已更新" : "管理密码已更新");
+      } else {
+        flash(d.error || "修改失败");
+      }
+    }
+
+    function render() {
+      let html = "";
+      if (!authed) {
+        html = `<main class="min-h-screen flex items-center justify-center bg-neutral-950 px-4"><div class="w-full max-w-sm">
+          <div class="flex flex-col items-center mb-8">
+            <div class="w-14 h-14 rounded-2xl bg-neutral-800 flex items-center justify-center mb-4"><i data-lucide="shield" class="w-6 h-6 text-amber-400"></i></div>
+            <h1 class="text-xl font-semibold text-white">边玩边赚游戏分享站管理后台</h1>
+            <p class="text-sm text-neutral-400 mt-2">输入管理密码登录</p>
+          </div>
+          <form onsubmit="handleLogin(event)" class="space-y-4">
+            <input type="password" value="${esc(password)}" oninput="password=this.value" placeholder="管理密码" autofocus class="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400 transition-colors"/>
+            ${error ? `<p class="text-sm text-red-400">${esc(error)}</p>` : ""}
+            <button type="submit" ${loading ? "disabled" : ""} class="w-full py-3 rounded-xl bg-white text-neutral-900 font-medium hover:bg-neutral-200 disabled:opacity-50 transition-colors">${loading ? "验证中..." : "登录"}</button>
+          </form>
+        </div></main>`;
+      } else {
+        const rn = RESOURCE_NAMES[resTab];
+        html = `<main class="min-h-screen bg-neutral-950 text-white">
+          <header class="border-b border-neutral-800"><div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-2"><i data-lucide="shield" class="w-5 h-5 text-amber-400"></i><h1 class="text-lg font-semibold">边玩边赚游戏分享站管理后台</h1></div>
+            <button onclick="handleLogout()" class="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</button>
+          </div></header>
+          <div class="max-w-2xl mx-auto px-4 py-6">
+            <div class="flex gap-2 mb-4">
+              ${Object.entries(RESOURCE_NAMES).map(([id, name]) => `<button onclick="resTab='${id}';render();" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${resTab === id ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}"><i data-lucide="user" class="w-3.5 h-3.5"></i> ${esc(name)}</button>`).join("")}
+            </div>
+            <div class="flex gap-2 mb-6">
+              <button onclick="tab='content';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "content" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">内容管理 · ${esc(rn)}</button>
+              <button onclick="tab='password';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "password" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">密码设置</button>
+            </div>
+            ${msg ? `<div class="mb-4 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400">${esc(msg)}</div>` : ""}
+            ${tab === "content" ? `
+              <div class="space-y-6">
+                <form onsubmit="handleAdd(event)" class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-4">
+                  <h2 class="font-medium flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i> 添加分享 · ${esc(rn)}</h2>
+                  <input value="${esc(newTitle)}" oninput="newTitle=this.value" placeholder="标题（必填）" required class="w-full px-4 py-2.5 rounded-xl bg-neutral-950 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400"/>
+                  <textarea oninput="newContent=this.value" placeholder="正文内容" rows="5" class="w-full px-4 py-2.5 rounded-xl bg-neutral-950 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400 resize-y">${esc(newContent)}</textarea>
+                  <button type="submit" ${submitting ? "disabled" : ""} class="w-full py-2.5 rounded-xl bg-white text-neutral-900 font-medium hover:bg-neutral-200 disabled:opacity-50 transition-colors">${submitting ? "提交中..." : "发布"}</button>
+                </form>
+                <div class="space-y-3">
+                  <h2 class="text-sm text-neutral-400">已发布（${items.length}）</h2>
+                  ${items.length === 0 ? '<p class="text-center text-neutral-600 py-8 text-sm">还没有内容，添加第一条吧</p>' : ""}
+                  ${items.slice().sort((a, b) => b.createdAt - a.createdAt).map((item) => `<div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4 flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2"><i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i><span class="font-medium truncate">${esc(item.title)}</span></div>
+                      ${item.url ? `<p class="text-xs text-neutral-500 mt-1 truncate">${esc(item.url)}</p>` : ""}
+                      ${item.content ? `<p class="text-xs text-neutral-500 mt-1 line-clamp-2">${esc(item.content)}</p>` : ""}
+                    </div>
+                    <button onclick="handleDelete('${esc(item.id)}')" class="p-2 rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0" title="删除"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                  </div>`).join("")}
+                </div>
+              </div>` : `
+              <div class="space-y-4">
+                <div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-3">
+                  <h2 class="font-medium flex items-center gap-2"><i data-lucide="key-round" class="w-4 h-4 text-blue-400"></i> 访客访问密码 · ${esc(rn)}</h2>
+                  <p class="text-xs text-neutral-500">当前资源的访客访问密码，输入此密码即可查看该资源分享内容（至少 4 位）</p>
+                  <div class="flex gap-2">
+                    <input value="${esc(visitorPwd)}" oninput="visitorPwd=this.value" placeholder="新访问密码" class="flex-1 px-4 py-2.5 rounded-xl bg-neutral-950 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400"/>
+                    <button onclick="handleChangePassword('visitor')" class="px-4 py-2.5 rounded-xl bg-white text-neutral-900 text-sm font-medium hover:bg-neutral-200 transition-colors">更新</button>
+                  </div>
+                </div>
+                <div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-3">
+                  <h2 class="font-medium flex items-center gap-2"><i data-lucide="key-round" class="w-4 h-4 text-amber-400"></i> 管理密码（全局）</h2>
+                  <p class="text-xs text-neutral-500">登录本管理后台的密码（至少 6 位），修改后立即生效，对所有资源通用</p>
+                  <div class="flex gap-2">
+                    <input value="${esc(adminPwd)}" oninput="adminPwd=this.value" placeholder="新管理密码" class="flex-1 px-4 py-2.5 rounded-xl bg-neutral-950 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400"/>
+                    <button onclick="handleChangePassword('admin')" class="px-4 py-2.5 rounded-xl bg-white text-neutral-900 text-sm font-medium hover:bg-neutral-200 transition-colors">更新</button>
+                  </div>
+                </div>
+              </div>`}
+          </div>
+        </main>`;
+      }
+      app.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    const saved = sessionStorage.getItem("admin_code");
+    if (saved) {
+      fetchItems(saved, resTab).then((ok) => {
+        if (ok) { adminCode = saved; authed = true; }
+        else sessionStorage.removeItem("admin_code");
+        render();
+      });
+    } else {
+      render();
+    }
+  </script>
+</body>
+</html>

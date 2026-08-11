@@ -1,0 +1,14 @@
+{
+  "name": "password-share",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "migrate": "wrangler d1 migrations apply password-share --remote",
+    "migrate:local": "wrangler d1 migrations apply password-share --local",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
