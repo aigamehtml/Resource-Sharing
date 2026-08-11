@@ -1,20 +1,20 @@
-name = "password-share"
-account_id = "9ee3b986aac4eb4749f734499516d80b"
-main = "worker.js"
-compatibility_date = "2026-08-11"
+name = 'resource-sharing'
+account_id = '9ee3b986aac4eb4749f734499516d80b'
+main = 'worker.js'
+compatibility_date = '2026-08-11'
 
 # 静态资源：前端纯静态 HTML（public/ 目录），由本 Worker 托管
 [assets]
-directory = "./public"
-binding = "ASSETS"
-html_handling = "auto-trailing-slash"
-not_found_handling = "404-page"
+directory = './public'
+binding = 'ASSETS'
+html_handling = 'auto-trailing-slash'
+not_found_handling = '404-page'
 
 # D1（Cloudflare 免费 SQLite）作为唯一存储，替代原 MySQL
 # 第一次部署前请先执行：npx wrangler d1 create password-share
 # 然后把输出的 database_id 填到下面
 [[d1_databases]]
-binding = "DB"
-database_name = "password-share"
-database_id = "b5c0a510-5c66-49e1-9c19-3bd8045d0d7a"
-migrations_dir = "migrations"
+binding = 'DB'
+database_name = 'password-share'
+database_id = 'b5c0a510-5c66-49e1-9c19-3bd8045d0d7a'
+migrations_dir = 'migrations'
