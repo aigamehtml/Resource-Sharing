@@ -1,4 +1,5 @@
 name = "password-share"
+account_id = "9ee3b986aac4eb4749f734499516d80b"
 main = "worker.js"
 compatibility_date = "2026-08-11"
 
@@ -15,5 +16,5 @@ not_found_handling = "404-page"
 [[d1_databases]]
 binding = "DB"
 database_name = "password-share"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "b5c0a510-5c66-49e1-9c19-3bd8045d0d7a"
 migrations_dir = "migrations"
