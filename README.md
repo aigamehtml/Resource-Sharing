@@ -5,8 +5,8 @@
 
 ## ✨ 功能
 
-- 访客页 `/`：先选资源账号（边玩边赚公众号 / 得劲滋润爽的B站），再输密码查看分享内容。两个资源各自独立。
-- 管理后台 `/admin/`：管理密码登录后，按资源分别管理（增删内容、改访客密码、改全局管理密码）。
+- 访客流程：首页 `/` 选资源账号（边玩边赚公众号 / 得劲滋润爽的B站）→ 访问密码页 `/login.html?resource=1|2` → 已授权内容页 `/content.html?resource=1|2` 查看分享内容。两个资源各自独立。
+- 管理后台：登录页 `/admin/login.html` → 仪表台 `/admin/`（管理密码登录后，按资源分别管理：增删内容、改访客密码、改全局管理密码）。
 - 数据存 **Cloudflare D1**，无需外部数据库、无需 KV 审批，免费额度足够。
 
 ## 🛠️ 技术栈（极简）
@@ -22,7 +22,7 @@
 | 访客访问密码 | `888888` |
 | 管理密码 | `admin888` |
 
-登录 `/admin/` → 「密码设置」即可修改。
+登录 `/admin/login.html` → 仪表台「密码设置」即可修改。
 
 ## 🚀 部署到 Cloudflare
 
@@ -69,11 +69,30 @@ password-share-cf/
 ├── migrations/
 │   └── 0001_init.sql         # D1 建表 + 预置管理密码
 ├── public/
-│   ├── index.html            # 访客页
-│   ├── admin/index.html      # 管理后台
+│   ├── index.html            # 首页：选择资源账号
+│   ├── login.html            # 访客访问密码页（?resource=1|2）
+│   ├── content.html          # 访客已授权内容页（?resource=1|2）
+│   ├── common.js             # 前后台公共函数（主题色 / 转义 / 复制 / URL 参数解析）
+│   ├── admin/
+│   │   ├── login.html        # 后台登录页
+│   │   └── index.html        # 后台仪表台
 │   └── *.png                 # 二维码等图片
 └── package.json              # 仅含 wrangler 与 deploy/migrate 脚本（可选）
 ```
+
+## 📄 页面路由
+
+前端按页面拆分为独立 HTML，状态通过 URL 参数 `?resource=` 与 `sessionStorage` 共享（公共 `common.js` 提供主题色、转义、复制等公共函数）。
+
+| 页面 | 路径 | 说明 |
+|------|------|------|
+| 首页 | `/` 或 `/index.html` | 选择资源账号（1=边玩边赚公众号 / 2=得劲滋润爽的B站），点击后跳 `/login.html?resource=<id>` |
+| 访客密码页 | `/login.html?resource=1\|2` | 输入访问密码；校验通过后写入 `sessionStorage.share_access`，跳 `/content.html?resource=<id>` |
+| 访客内容页 | `/content.html?resource=1\|2` | 校验 `sessionStorage.share_access` + 请求头 `X-Access-Code`；分页每页 10 条、最新在前、按资源应用主题色（公众号=微信绿 / B站=粉） |
+| 后台登录页 | `/admin/login.html` | 输入管理密码；校验通过后写入 `sessionStorage.admin_code`，跳 `/admin/index.html` |
+| 后台仪表台 | `/admin/` 或 `/admin/index.html` | 校验 `sessionStorage.admin_code`，无令牌则跳登录页；按资源增删内容、改密码 |
+
+> 资源编号约定：`1` = 边玩边赚公众号（微信绿 `#07C160`），`2` = 得劲滋润爽的B站（B站粉 `#FB7299`）；公共页面保持中性主题。
 
 ## 🎯 API 一览（与原版一致）
 
