@@ -31,7 +31,7 @@
       },
     };
     const app = document.getElementById("app");
-    let resource = null, authed = false, password = "", error = "", items = [], fetching = false, loading = false;
+    let resource = null, authed = false, password = "", error = "", items = [], fetching = false, loading = false, page = 1, pageSize = 10;
 
     const fmtDate = (ts) =>
       new Date(ts).toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
@@ -48,6 +48,7 @@
           const data = await res.json();
           items = data.items || [];
           authed = true;
+          page = 1;
           sessionStorage.setItem("share_access", JSON.stringify({ resource: resId, code }));
         } else {
           sessionStorage.removeItem("share_access");
@@ -60,7 +61,7 @@
     }
 
     function selectResource(id) {
-      resource = id; password = ""; error = ""; authed = false; items = []; render();
+      resource = id; password = ""; error = ""; authed = false; items = []; page = 1; render();
     }
 
     async function handleLogin(e) {
@@ -87,7 +88,13 @@
 
     function back() {
       sessionStorage.removeItem("share_access");
-      resource = null; authed = false; password = ""; items = []; error = ""; render();
+      resource = null; authed = false; password = ""; items = []; page = 1; error = ""; render();
+    }
+
+    function changePage(delta) {
+      const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+      page = Math.min(totalPages, Math.max(1, page + delta));
+      render();
     }
 
     function render() {
@@ -123,14 +130,10 @@
         </div></main>`;
       } else {
         const cfg = RESOURCES[resource];
-        html = `<main class="min-h-screen bg-neutral-950 text-white">
-          <header class="border-b border-neutral-800"><div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-            <h1 class="text-lg font-semibold">${esc(cfg.title)}</h1>
-            <button onclick="back()" class="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</button>
-          </div></header>
-          <div class="max-w-2xl mx-auto px-4 py-8 space-y-4">
-            ${items.length === 0 ? '<p class="text-center text-neutral-500 py-16">暂无分享内容</p>' : ""}
-            ${items.map((item) => `<div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
+        const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+        const start = (page - 1) * pageSize;
+        const pageItems = items.slice(start, start + pageSize);
+        const itemHtml = (item) => `<div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
               <div class="flex items-start justify-between gap-3">
                 <div class="flex items-center gap-2 min-w-0">
                   ${item.type === "link" ? '<i data-lucide="link" class="w-4 h-4 text-blue-400 shrink-0"></i>' : '<i data-lucide="file-text" class="w-4 h-4 text-emerald-400 shrink-0"></i>'}
@@ -140,7 +143,19 @@
               </div>
               ${item.content ? `<p class="mt-3 text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed">${esc(item.content)}</p>` : ""}
               ${item.type === "link" && item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 break-all">${esc(item.url)} <i data-lucide="external-link" class="w-3.5 h-3.5 shrink-0"></i></a>` : ""}
-            </div>`).join("")}
+            </div>`;
+        html = `<main class="min-h-screen bg-neutral-950 text-white">
+          <header class="border-b border-neutral-800"><div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+            <h1 class="text-lg font-semibold">${esc(cfg.title)}</h1>
+            <button onclick="back()" class="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</button>
+          </div></header>
+          <div class="max-w-2xl mx-auto px-4 py-8 space-y-4">
+            ${items.length === 0 ? '<p class="text-center text-neutral-500 py-16">暂无分享内容</p>' : `${pageItems.map(itemHtml).join("")}
+            <div class="flex items-center justify-between pt-2">
+              <button onclick="changePage(-1)" ${page <= 1 ? "disabled" : ""} class="px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-neutral-300 hover:border-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">上一页</button>
+              <span class="text-xs text-neutral-500">第 ${page} / ${totalPages} 页 · 共 ${items.length} 条</span>
+              <button onclick="changePage(1)" ${page >= totalPages ? "disabled" : ""} class="px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-neutral-300 hover:border-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">下一页</button>
+            </div>`}
           </div>
         </main>`;
       }
