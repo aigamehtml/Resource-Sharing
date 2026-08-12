@@ -36,6 +36,24 @@
       return false;
     }
 
+    // 统一的后台请求封装：携带会话令牌，遇到「未授权」自动退回登录
+    async function adminFetch(url, payload) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Code": adminCode },
+        body: JSON.stringify(payload),
+      });
+      let d = {};
+      try { d = await res.json(); } catch (_) {}
+      if (res.status === 401 && (d.error === "未授权" || d.error === "管理密码错误")) {
+        sessionStorage.removeItem("admin_code");
+        authed = false; adminCode = ""; password = "";
+        flash(d.error || "登录已失效，请重新登录");
+        return null;
+      }
+      return { res, d };
+    }
+
     async function handleLogin(e) {
       e.preventDefault();
       if (!password.trim()) return;
@@ -47,9 +65,10 @@
           body: JSON.stringify({ password }),
         });
         if (res.ok) {
-          adminCode = password;
-          sessionStorage.setItem("admin_code", password);
-          await fetchItems(password, resTab);
+          const d = await res.json().catch(() => ({}));
+          adminCode = d.token || password;
+          sessionStorage.setItem("admin_code", adminCode);
+          await fetchItems(adminCode, resTab);
           authed = true;
         } else {
           let m = "管理密码错误";
@@ -69,39 +88,32 @@
 
     async function handleAdd(e) {
       e.preventDefault();
+      if (!newTitle.trim()) { flash("标题不能为空"); return; }
       submitting = true; render();
-      try {
-        const res = await fetch("/api/admin/content", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Admin-Code": adminCode },
-          body: JSON.stringify({ resource: resTab, type: "text", title: newTitle, content: newContent }),
-        });
-        const d = await res.json();
-        if (res.ok) {
-          newTitle = ""; newContent = "";
-          await fetchItems(adminCode, resTab);
-          flash("添加成功");
-        } else {
-          flash(d.error || "添加失败");
-        }
-      } catch (_) {
-        flash("网络错误");
+      const r = await adminFetch("/api/admin/content", { resource: resTab, type: "text", title: newTitle, content: newContent });
+      submitting = false;
+      if (!r) return;
+      const { res, d } = r;
+      if (res.ok) {
+        newTitle = ""; newContent = "";
+        await fetchItems(adminCode, resTab);
+        flash("添加成功");
+      } else {
+        flash(d.error || "添加失败");
       }
-      submitting = false; render();
+      render();
     }
 
     async function handleDelete(id) {
       if (!confirm("确定删除这条内容吗？")) return;
-      const res = await fetch("/api/admin/content/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Code": adminCode },
-        body: JSON.stringify({ resource: resTab, id }),
-      });
+      const r = await adminFetch("/api/admin/content/delete", { resource: resTab, id });
+      if (!r) return;
+      const { res, d } = r;
       if (res.ok) {
         items = items.filter((it) => it.id !== id);
         flash("已删除");
       } else {
-        flash("删除失败");
+        flash(d.error || "删除失败");
       }
     }
 
@@ -111,16 +123,13 @@
       const body = which === "visitor"
         ? { resource: resTab, visitorPassword: value }
         : { adminPassword: value };
-      const res = await fetch("/api/admin/password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Code": adminCode },
-        body: JSON.stringify(body),
-      });
-      const d = await res.json();
+      const r = await adminFetch("/api/admin/password", body);
+      if (!r) return;
+      const { res, d } = r;
       if (res.ok) {
-        if (which === "admin") { adminCode = value; sessionStorage.setItem("admin_code", value); }
+        // 改管理密码不改会话令牌：当前登录保持有效，发布/删除不会因改密码而失步
         visitorPwd = ""; adminPwd = "";
-        flash(which === "visitor" ? "访问密码已更新" : "管理密码已更新");
+        flash(which === "visitor" ? "访问密码已更新" : "管理密码已更新（当前登录会话保持有效）");
       } else {
         flash(d.error || "修改失败");
       }

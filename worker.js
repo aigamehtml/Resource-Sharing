@@ -61,6 +61,25 @@ async function getPasswords(db) {
   return p
 }
 
+// 管理后台会话令牌：登录时签发并存 D1，改密码不改令牌，避免活跃会话失步
+function genToken() {
+  try {
+    return crypto.randomUUID().replace(/-/g, "") + Math.random().toString(36).slice(2, 10)
+  } catch {
+    return "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 12)
+  }
+}
+
+async function getAdminToken(db) {
+  const t = await getKV(db, "admin_session")
+  return t || null
+}
+
+async function requireAdmin(req, db) {
+  const token = await getAdminToken(db)
+  return token != null && header(req, "x-admin-code") === token
+}
+
 function header(req, name) {
   return req.headers.get(name)
 }
@@ -99,10 +118,14 @@ export default {
         return json({ d1: true, storage: "d1" })
       }
 
-      // POST /api/auth/admin
+      // POST /api/auth/admin —— 校验通过后签发会话令牌
       if (path === "/api/auth/admin" && method === "POST") {
         const p = await getPasswords(db)
-        if (body.password === p.adminPassword) return json({ ok: true })
+        if (body.password === p.adminPassword) {
+          const token = genToken()
+          await setKV(db, "admin_session", token)
+          return json({ ok: true, token })
+        }
         return json({ error: "管理密码错误" }, 401)
       }
 
@@ -119,15 +142,14 @@ export default {
         const access = header(request, "x-access-code")
         const admin = header(request, "x-admin-code")
         const r = await getResource(db, rid)
-        if (admin) return json({ items: r.content || [] })
+        if (await requireAdmin(req, db)) return json({ items: r.content || [] })
         if (access === r.accessPassword) return json({ items: r.content || [] })
         return json({ error: "密码错误" }, 401)
       }
 
       // POST /api/admin/content  (新增)
       if (path === "/api/admin/content" && method === "POST") {
-        const p = await getPasswords(db)
-        if (header(request, "x-admin-code") !== p.adminPassword)
+        if (!(await requireAdmin(req, db)))
           return json({ error: "未授权" }, 401)
         const r = await getResource(db, rid)
         const item = {
@@ -147,8 +169,7 @@ export default {
 
       // POST /api/admin/content/delete
       if (path === "/api/admin/content/delete" && method === "POST") {
-        const p = await getPasswords(db)
-        if (header(request, "x-admin-code") !== p.adminPassword)
+        if (!(await requireAdmin(req, db)))
           return json({ error: "未授权" }, 401)
         const r = await getResource(db, rid)
         r.content = (r.content || []).filter((it) => it.id !== body.id)
@@ -158,8 +179,7 @@ export default {
 
       // POST /api/admin/password
       if (path === "/api/admin/password" && method === "POST") {
-        const p = await getPasswords(db)
-        if (header(request, "x-admin-code") !== p.adminPassword)
+        if (!(await requireAdmin(req, db)))
           return json({ error: "未授权" }, 401)
         if (body.adminPassword != null) {
           const v = String(body.adminPassword)
