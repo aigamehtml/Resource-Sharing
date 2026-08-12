@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>资源分享 · 私密分享站</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="common.js"></script>
+  <style>
+    :root { --accent: #6b7280; --accent-hover: #4b5563; }
+    .accent-btn { background-color: var(--accent); }
+    .accent-btn:hover { background-color: var(--accent-hover); }
+    .accent-text { color: var(--accent); }
+    .accent-text-hover:hover { color: var(--accent); }
+    .accent-bar { background-color: var(--accent); }
+    .accent-hoverable:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body class="bg-neutral-950 text-white">
+  <div id="app"></div>
+  <script>
+    const app = document.getElementById("app");
+    const resource = (function () {
+      const p = getQueryParam("resource");
+      return RESOURCES[p] ? p : null;
+    })();
+    let items = [], fetching = false, page = 1, pageSize = 10, copiedId = null, error = "";
+
+    async function load() {
+      const saved = sessionStorage.getItem("share_access");
+      if (!saved || !resource) { location.href = "login.html?resource=" + (resource || "1"); return; }
+      let o;
+      try { o = JSON.parse(saved); } catch (_) { location.href = "login.html?resource=" + resource; return; }
+      if (!o.resource || o.resource !== resource) { location.href = "login.html?resource=" + resource; return; }
+      fetching = true; render();
+      try {
+        const res = await fetch("/api/content?resource=" + resource, { headers: { "X-Access-Code": o.code } });
+        if (res.ok) {
+          const data = await res.json();
+          items = (data.items || []).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          copiedId = null; page = 1;
+        } else {
+          sessionStorage.removeItem("share_access");
+          location.href = "login.html?resource=" + resource; return;
+        }
+      } catch (_) {
+        error = "网络错误，请稍后重试";
+      }
+      fetching = false; render();
+    }
+
+    function changePage(delta) {
+      const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+      page = Math.min(totalPages, Math.max(1, page + delta));
+      render();
+    }
+
+    async function copyItem(id) {
+      const it = items.find((x) => x.id === id);
+      if (!it) return;
+      const text = it.type === "link" && it.url ? it.url : (it.content || it.title || "");
+      const ok = await copyText(text);
+      if (ok) {
+        copiedId = id; render();
+        setTimeout(() => { copiedId = null; render(); }, 1500);
+      }
+    }
+
+    function back() {
+      sessionStorage.removeItem("share_access");
+      location.href = "index.html";
+    }
+
+    function render() {
+      if (!resource) {
+        app.innerHTML = `<main class="min-h-screen flex items-center justify-center bg-neutral-950 px-4"><div class="text-center"><p class="text-neutral-400">资源不存在</p><a href="index.html" class="mt-4 inline-block text-sm text-blue-400">返回首页</a></div></main>`;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+      applyTheme(resource);
+      const cfg = RESOURCES[resource];
+      const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+      const start = (page - 1) * pageSize;
+      const pageItems = items.slice(start, start + pageSize);
+      const itemHtml = (item) => `<div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center gap-2 min-w-0">
+                ${item.type === "link" ? '<i data-lucide="link" class="w-4 h-4 accent-text shrink-0"></i>' : '<i data-lucide="file-text" class="w-4 h-4 accent-text shrink-0"></i>'}
+                <h2 class="font-medium truncate">${esc(item.title)}</h2>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="copyItem('${esc(item.id)}')" class="inline-flex items-center gap-1 text-xs text-neutral-400 accent-text-hover transition-colors">${copiedId === item.id ? "已复制" : '<i data-lucide="copy" class="w-3.5 h-3.5"></i> 复制'}</button>
+                <span class="text-xs text-neutral-500">${fmtDate(item.createdAt)}</span>
+              </div>
+            </div>
+            ${item.content ? `<p class="mt-3 text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed">${esc(item.content)}</p>` : ""}
+            ${item.type === "link" && item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center gap-1.5 text-sm accent-text break-all">${esc(item.url)} <i data-lucide="external-link" class="w-3.5 h-3.5 shrink-0"></i></a>` : ""}
+          </div>`;
+      const html = `<main class="min-h-screen bg-neutral-950 text-white">
+        <header class="border-b border-neutral-800"><div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div class="flex items-center gap-2"><span class="w-1.5 h-5 rounded accent-bar"></span><h1 class="text-lg font-semibold">${esc(cfg.title)}</h1></div>
+          <button onclick="back()" class="flex items-center gap-1.5 text-sm text-neutral-400 accent-text-hover transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</button>
+        </div></header>
+        <div class="max-w-2xl mx-auto px-4 py-8 space-y-4">
+          ${items.length === 0 ? '<p class="text-center text-neutral-500 py-16">' + (error || "暂无分享内容") + '</p>' : `${pageItems.map(itemHtml).join("")}
+          <div class="flex items-center justify-between pt-2">
+            <button onclick="changePage(-1)" ${page <= 1 ? "disabled" : ""} class="px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-neutral-300 accent-hoverable disabled:opacity-40 disabled:cursor-not-allowed transition-colors">上一页</button>
+            <span class="text-xs text-neutral-500">第 ${page} / ${totalPages} 页 · 共 ${items.length} 条</span>
+            <button onclick="changePage(1)" ${page >= totalPages ? "disabled" : ""} class="px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-neutral-300 accent-hoverable disabled:opacity-40 disabled:cursor-not-allowed transition-colors">下一页</button>
+          </div>`}
+        </div>
+      </main>`;
+      app.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    load();
+  </script>
+</body>
+</html>
