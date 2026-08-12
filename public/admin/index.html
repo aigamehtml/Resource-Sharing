@@ -172,7 +172,10 @@
       const html = `<main class="min-h-screen bg-neutral-950 text-white">
         <header class="border-b border-neutral-800"><div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <div class="flex items-center gap-2"><i data-lucide="shield" class="w-5 h-5 text-amber-400"></i><h1 class="text-lg font-semibold">边玩边赚游戏分享站管理后台</h1></div>
-          <button onclick="handleLogout()" class="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</button>
+          <div class="flex items-center gap-3">
+            <button onclick="tab='password';render();" class="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white transition-colors"><i data-lucide="key-round" class="w-4 h-4"></i> 密码设置</button>
+            <button onclick="handleLogout()" class="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</button>
+          </div>
         </div></header>
         <div class="max-w-2xl mx-auto px-4 py-6">
           <div class="flex gap-2 mb-4">
@@ -180,7 +183,6 @@
           </div>
           <div class="flex gap-2 mb-6">
             <button onclick="tab='content';page=1;render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "content" ? "" : "bg-neutral-900 text-neutral-400 hover:text-white"}" ${tab === "content" ? 'style="background:var(--accent);color:#fff"' : ""}>内容管理 · ${esc(rn)}</button>
-            <button onclick="tab='password';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "password" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">密码设置</button>
             <button onclick="tab='backup';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "backup" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">数据备份</button>
           </div>
           ${msg ? `<div class="mb-4 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400">${esc(msg)}</div>` : ""}

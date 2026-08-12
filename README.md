@@ -22,7 +22,7 @@
 | 访客访问密码 | `888888` |
 | 管理密码 | `admin888` |
 
-登录 `/admin/login.html` → 仪表台「密码设置」即可修改。
+登录 `/admin/login.html` → 仪表台右上角「密码设置」即可修改。
 
 ## 🚀 部署到 Cloudflare
 
@@ -90,9 +90,10 @@ password-share-cf/
 | 访客密码页 | `/login.html?resource=1\|2` | 输入访问密码；校验通过后写入 `sessionStorage.share_access`，跳 `/content.html?resource=<id>` |
 | 访客内容页 | `/content.html?resource=1\|2` | 校验 `sessionStorage.share_access` + 请求头 `X-Access-Code`；分页每页 10 条、最新在前、按资源应用主题色（公众号=微信绿 / B站=粉） |
 | 后台登录页 | `/admin/login.html` | 输入管理密码；校验通过后写入 `sessionStorage.admin_code`，跳 `/admin/index.html` |
-| 后台仪表台 | `/admin/` 或 `/admin/index.html` | 校验 `sessionStorage.admin_code`，无令牌则跳登录页；按资源增删内容、改密码 |
+| 后台仪表台 | `/admin/` 或 `/admin/index.html` | 校验 `sessionStorage.admin_code`，无令牌则跳登录页；按资源增删内容、数据备份/还原；右上角「密码设置」改访客密码与管理密码 |
 
-> 资源编号约定：`1` = 边玩边赚公众号（微信绿 `#07C160`），`2` = 得劲滋润爽的B站（B站粉 `#FB7299`）；公共页面保持中性主题。
+> 资源编号约定：`1` = 边玩边赚公众号（微信绿 `#07C160`），`2` = 得劲滋润爽的B站（B站粉 `#FB7299`）；公共页面（首页/访客）保持中性主题。
+> 后台仪表台同样按当前账户套用主题色：账户切换 tab、内容管理 tab、内容列表图标随资源变绿/变粉；「密码设置」「数据备份」等全局操作保持中性。
 
 ## 🎯 API 一览（与原版一致）
 
