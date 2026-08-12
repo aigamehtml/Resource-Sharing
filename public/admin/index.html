@@ -14,7 +14,7 @@
     const app = document.getElementById("app");
     let authed = false, adminCode = "", password = "", error = "", loading = false;
     let resTab = "1", tab = "content", items = [], msg = "";
-    let newTitle = "", newContent = "", submitting = false, visitorPwd = "", adminPwd = "";
+    let newTitle = "", newContent = "", submitting = false, visitorPwd = "", adminPwd = "", page = 1, pageSize = 10;
 
     const esc = (s) =>
       String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
@@ -31,6 +31,7 @@
       if (res.ok) {
         const d = await res.json();
         items = d.items || [];
+        page = 1;
         return true;
       }
       return false;
@@ -111,6 +112,8 @@
       const { res, d } = r;
       if (res.ok) {
         items = items.filter((it) => it.id !== id);
+        const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+        if (page > totalPages) page = totalPages;
         flash("已删除");
       } else {
         flash(d.error || "删除失败");
@@ -133,6 +136,18 @@
       } else {
         flash(d.error || "修改失败");
       }
+    }
+
+    function changePage(delta) {
+      const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+      page = Math.min(totalPages, Math.max(1, page + delta));
+      render();
+    }
+
+    async function switchResource(id) {
+      resTab = id; page = 1;
+      await fetchItems(adminCode, resTab);
+      render();
     }
 
     function render() {
@@ -159,10 +174,10 @@
           </div></header>
           <div class="max-w-2xl mx-auto px-4 py-6">
             <div class="flex gap-2 mb-4">
-              ${Object.entries(RESOURCE_NAMES).map(([id, name]) => `<button onclick="resTab='${id}';render();" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${resTab === id ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}"><i data-lucide="user" class="w-3.5 h-3.5"></i> ${esc(name)}</button>`).join("")}
+              ${Object.entries(RESOURCE_NAMES).map(([id, name]) => `<button onclick="void switchResource('${id}')" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${resTab === id ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}"><i data-lucide="user" class="w-3.5 h-3.5"></i> ${esc(name)}</button>`).join("")}
             </div>
             <div class="flex gap-2 mb-6">
-              <button onclick="tab='content';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "content" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">内容管理 · ${esc(rn)}</button>
+              <button onclick="tab='content';page=1;render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "content" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">内容管理 · ${esc(rn)}</button>
               <button onclick="tab='password';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "password" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">密码设置</button>
             </div>
             ${msg ? `<div class="mb-4 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400">${esc(msg)}</div>` : ""}
@@ -175,16 +190,28 @@
                   <button type="submit" ${submitting ? "disabled" : ""} class="w-full py-2.5 rounded-xl bg-white text-neutral-900 font-medium hover:bg-neutral-200 disabled:opacity-50 transition-colors">${submitting ? "提交中..." : "发布"}</button>
                 </form>
                 <div class="space-y-3">
-                  <h2 class="text-sm text-neutral-400">已发布（${items.length}）</h2>
-                  ${items.length === 0 ? '<p class="text-center text-neutral-600 py-8 text-sm">还没有内容，添加第一条吧</p>' : ""}
-                  ${items.slice().sort((a, b) => b.createdAt - a.createdAt).map((item) => `<div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4 flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2"><i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i><span class="font-medium truncate">${esc(item.title)}</span></div>
-                      ${item.url ? `<p class="text-xs text-neutral-500 mt-1 truncate">${esc(item.url)}</p>` : ""}
-                      ${item.content ? `<p class="text-xs text-neutral-500 mt-1 line-clamp-2">${esc(item.content)}</p>` : ""}
-                    </div>
-                    <button onclick="handleDelete('${esc(item.id)}')" class="p-2 rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0" title="删除"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                  </div>`).join("")}
+                  ${(() => {
+                    const sorted = items.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+                    const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
+                    return `
+                      <h2 class="text-sm text-neutral-400">已发布（${sorted.length}）</h2>
+                      ${sorted.length === 0 ? '<p class="text-center text-neutral-600 py-8 text-sm">还没有内容，添加第一条吧</p>' : ""}
+                      ${pageItems.map((item) => `<div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4 flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-2"><i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i><span class="font-medium truncate">${esc(item.title)}</span></div>
+                          ${item.url ? `<p class="text-xs text-neutral-500 mt-1 truncate">${esc(item.url)}</p>` : ""}
+                          ${item.content ? `<p class="text-xs text-neutral-500 mt-1 line-clamp-2">${esc(item.content)}</p>` : ""}
+                        </div>
+                        <button onclick="handleDelete('${esc(item.id)}')" class="p-2 rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0" title="删除"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                      </div>`).join("")}
+                      ${totalPages > 1 ? `<div class="flex items-center justify-center gap-3 pt-2">
+                        <button onclick="changePage(-1)" ${page <= 1 ? "disabled" : ""} class="px-3 py-1.5 rounded-lg text-sm ${page <= 1 ? "text-neutral-700" : "text-neutral-300 hover:bg-neutral-800"} transition-colors">上一页</button>
+                        <span class="text-xs text-neutral-500">第 ${page} / ${totalPages} 页 · 共 ${sorted.length} 条</span>
+                        <button onclick="changePage(1)" ${page >= totalPages ? "disabled" : ""} class="px-3 py-1.5 rounded-lg text-sm ${page >= totalPages ? "text-neutral-700" : "text-neutral-300 hover:bg-neutral-800"} transition-colors">下一页</button>
+                      </div>` : ""}
+                    `;
+                  })()}
                 </div>
               </div>` : `
               <div class="space-y-4">
