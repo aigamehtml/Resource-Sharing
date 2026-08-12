@@ -104,6 +104,8 @@ password-share-cf/
 | POST | /api/admin/content | 添加内容（需 `X-Admin-Code` + `resource`） |
 | POST | /api/admin/content/delete | 删除内容（需 `X-Admin-Code` + `resource`） |
 | POST | /api/admin/password | 改访客/管理密码（需 `X-Admin-Code`） |
+| GET | /api/admin/export | 导出全部数据（密码 + 各资源内容，不含会话令牌；需 `X-Admin-Code`） |
+| POST | /api/admin/import | 用备份 JSON 覆盖还原数据（需 `X-Admin-Code`） |
 
 ## ⚠️ 说明
 

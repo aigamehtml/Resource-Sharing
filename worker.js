@@ -10,6 +10,8 @@
 //   POST /api/admin/content
 //   POST /api/admin/content/delete
 //   POST /api/admin/password
+//   GET  /api/admin/export        （导出全部数据，不含会话令牌）
+//   POST /api/admin/import         （用备份覆盖还原数据，不改动会话令牌）
 
 const DEFAULT_ADMIN = "admin888"
 const DEFAULT_VISITOR = "888888"
@@ -207,6 +209,43 @@ export default {
           return json({ ok: true })
         }
         return json({ error: "缺少密码字段" }, 400)
+      }
+
+      // GET /api/admin/export —— 导出全部数据（密码 + 各资源内容），不含会话令牌
+      if (path === "/api/admin/export" && method === "GET") {
+        if (!(await requireAdmin(request, db)))
+          return json({ error: "未授权" }, 401)
+        const passwords = await getKV(db, "passwords")
+        const res = {}
+        for (const id of ["1", "2"]) {
+          res[id] = await getResource(db, id)
+        }
+        return json({
+          version: 1,
+          exportedAt: Date.now(),
+          data: { passwords, res },
+        })
+      }
+
+      // POST /api/admin/import —— 用备份文件覆盖数据（密码 + 各资源内容），不改动会话令牌
+      if (path === "/api/admin/import" && method === "POST") {
+        if (!(await requireAdmin(request, db)))
+          return json({ error: "未授权" }, 401)
+        if (!body || typeof body !== "object" || !body.data || typeof body.data !== "object")
+          return json({ error: "文件格式不正确" }, 400)
+        const data = body.data
+        if (data.passwords && typeof data.passwords === "object") {
+          await setKV(db, "passwords", data.passwords)
+        }
+        if (data.res && typeof data.res === "object") {
+          for (const id of Object.keys(data.res)) {
+            if (!/^\d+$/.test(id)) continue
+            if (data.res[id] && typeof data.res[id] === "object") {
+              await setKV(db, `res:${id}`, data.res[id])
+            }
+          }
+        }
+        return json({ ok: true })
       }
 
       return json({ error: "Not Found: " + path }, 404)

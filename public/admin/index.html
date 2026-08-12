@@ -118,6 +118,54 @@
       location.href = "login.html";
     }
 
+    async function handleExport() {
+      try {
+        const res = await fetch("/api/admin/export", { headers: { "X-Admin-Code": adminCode } });
+        if (res.status === 401) {
+          sessionStorage.removeItem("admin_code");
+          location.href = "login.html";
+          return;
+        }
+        if (!res.ok) { flash("导出失败"); return; }
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+        a.href = URL.createObjectURL(blob);
+        a.download = "share-backup-" + ts + ".json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+        flash("已导出数据文件");
+      } catch (e) {
+        flash("导出失败：" + (e && e.message ? e.message : e));
+      }
+    }
+
+    async function handleImportFile(e) {
+      const input = e.target;
+      const file = input.files && input.files[0];
+      input.value = "";
+      if (!file) return;
+      if (!confirm("导入将覆盖当前的资源共享密码与内容，确定继续？")) return;
+      try {
+        const text = await file.text();
+        const obj = JSON.parse(text);
+        const r = await adminFetch("/api/admin/import", obj);
+        if (!r) return;
+        const { res, d } = r;
+        if (res.ok) {
+          await fetchItems(adminCode, resTab);
+          flash("数据已导入");
+        } else {
+          flash(d.error || "导入失败");
+        }
+      } catch (err) {
+        flash("导入失败：" + (err && err.message ? err.message : "文件格式错误"));
+      }
+    }
+
     function render() {
       const rn = RESOURCE_NAMES[resTab];
       const html = `<main class="min-h-screen bg-neutral-950 text-white">
@@ -132,6 +180,7 @@
           <div class="flex gap-2 mb-6">
             <button onclick="tab='content';page=1;render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "content" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">内容管理 · ${esc(rn)}</button>
             <button onclick="tab='password';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "password" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">密码设置</button>
+            <button onclick="tab='backup';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "backup" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">数据备份</button>
           </div>
           ${msg ? `<div class="mb-4 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400">${esc(msg)}</div>` : ""}
           ${tab === "content" ? `
@@ -166,7 +215,7 @@
                   `;
                 })()}
               </div>
-            </div>` : `
+            </div>` : tab === "password" ? `
             <div class="space-y-4">
               <div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-3">
                 <h2 class="font-medium flex items-center gap-2"><i data-lucide="key-round" class="w-4 h-4 text-blue-400"></i> 访客访问密码 · ${esc(rn)}</h2>
@@ -182,6 +231,17 @@
                 <div class="flex gap-2">
                   <input value="${esc(adminPwd)}" oninput="adminPwd=this.value" placeholder="新管理密码" class="flex-1 px-4 py-2.5 rounded-xl bg-neutral-950 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400"/>
                   <button onclick="handleChangePassword('admin')" class="px-4 py-2.5 rounded-xl bg-white text-neutral-900 text-sm font-medium hover:bg-neutral-200 transition-colors">更新</button>
+                </div>
+              </div>
+            </div>` : `
+            <div class="space-y-4">
+              <div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 space-y-3">
+                <h2 class="font-medium flex items-center gap-2"><i data-lucide="database" class="w-4 h-4 text-emerald-400"></i> 数据备份与还原</h2>
+                <p class="text-xs text-neutral-500 leading-relaxed">导出会下载一个 JSON 文件，包含全部资源共享密码与内容；导入将用该文件覆盖当前数据（不会登出当前后台登录）。</p>
+                <div class="flex gap-2 pt-1">
+                  <button onclick="handleExport()" class="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-neutral-900 text-sm font-medium hover:bg-neutral-200 transition-colors"><i data-lucide="download" class="w-4 h-4"></i> 一键导出</button>
+                  <button onclick="document.getElementById('importFile').click()" class="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-neutral-700 text-neutral-200 text-sm font-medium hover:bg-neutral-800 transition-colors"><i data-lucide="upload" class="w-4 h-4"></i> 一键导入</button>
+                  <input id="importFile" type="file" accept="application/json,.json" class="hidden" onchange="handleImportFile(event)"/>
                 </div>
               </div>
             </div>`}
