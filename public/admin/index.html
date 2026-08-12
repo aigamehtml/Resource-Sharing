@@ -168,6 +168,7 @@
 
     function render() {
       const rn = RESOURCE_NAMES[resTab];
+      applyTheme(resTab);
       const html = `<main class="min-h-screen bg-neutral-950 text-white">
         <header class="border-b border-neutral-800"><div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <div class="flex items-center gap-2"><i data-lucide="shield" class="w-5 h-5 text-amber-400"></i><h1 class="text-lg font-semibold">边玩边赚游戏分享站管理后台</h1></div>
@@ -175,10 +176,10 @@
         </div></header>
         <div class="max-w-2xl mx-auto px-4 py-6">
           <div class="flex gap-2 mb-4">
-            ${Object.entries(RESOURCE_NAMES).map(([id, name]) => `<button onclick="void switchResource('${id}')" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${resTab === id ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}"><i data-lucide="user" class="w-3.5 h-3.5"></i> ${esc(name)}</button>`).join("")}
+            ${Object.entries(RESOURCE_NAMES).map(([id, name]) => `<button onclick="void switchResource('${id}')" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${resTab === id ? "" : "bg-neutral-900 text-neutral-400 hover:text-white"}" ${resTab === id ? 'style="background:var(--accent);color:#fff"' : ""}><i data-lucide="user" class="w-3.5 h-3.5"></i> ${esc(name)}</button>`).join("")}
           </div>
           <div class="flex gap-2 mb-6">
-            <button onclick="tab='content';page=1;render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "content" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">内容管理 · ${esc(rn)}</button>
+            <button onclick="tab='content';page=1;render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "content" ? "" : "bg-neutral-900 text-neutral-400 hover:text-white"}" ${tab === "content" ? 'style="background:var(--accent);color:#fff"' : ""}>内容管理 · ${esc(rn)}</button>
             <button onclick="tab='password';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "password" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">密码设置</button>
             <button onclick="tab='backup';render();" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "backup" ? "bg-white text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-white"}">数据备份</button>
           </div>
@@ -201,7 +202,7 @@
                     ${sorted.length === 0 ? '<p class="text-center text-neutral-600 py-8 text-sm">还没有内容，添加第一条吧</p>' : ""}
                     ${pageItems.map((item) => `<div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4 flex items-start justify-between gap-3">
                       <div class="min-w-0">
-                        <div class="flex items-center gap-2"><i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i><span class="font-medium truncate">${esc(item.title)}</span></div>
+                        <div class="flex items-center gap-2"><i data-lucide="file-text" class="w-3.5 h-3.5 shrink-0" style="color:var(--accent)"></i><span class="font-medium truncate">${esc(item.title)}</span></div>
                         ${item.url ? `<p class="text-xs text-neutral-500 mt-1 truncate">${esc(item.url)}</p>` : ""}
                         ${item.content ? `<p class="text-xs text-neutral-500 mt-1 line-clamp-2">${esc(item.content)}</p>` : ""}
                       </div>
