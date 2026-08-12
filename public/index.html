@@ -6,6 +6,15 @@
   <title>私密分享站</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root { --accent: #6b7280; --accent-hover: #4b5563; }
+    .accent-btn { background-color: var(--accent); }
+    .accent-btn:hover { background-color: var(--accent-hover); }
+    .accent-text { color: var(--accent); }
+    .accent-text-hover:hover { color: var(--accent); }
+    .accent-bar { background-color: var(--accent); }
+    .accent-hoverable:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
 </head>
 <body class="bg-neutral-950 text-white">
   <div id="app"></div>
@@ -30,6 +39,15 @@
         qrAlt: "得劲滋润爽的B站UP主空间二维码",
       },
     };
+    const THEME = {
+      "1": { accent: "#07C160", hover: "#06AD56" }, // 微信主题绿
+      "2": { accent: "#FB7299", hover: "#F25C8A" }, // B站默认主题粉
+    };
+    function applyTheme() {
+      const t = THEME[resource] || { accent: "#6b7280", hover: "#4b5563" };
+      document.documentElement.style.setProperty("--accent", t.accent);
+      document.documentElement.style.setProperty("--accent-hover", t.hover);
+    }
     const app = document.getElementById("app");
     let resource = null, authed = false, password = "", error = "", items = [], fetching = false, loading = false, page = 1, pageSize = 10, copiedId = null;
 
@@ -120,6 +138,7 @@
     }
 
     function render() {
+      applyTheme();
       let html = "";
       if (!resource) {
         html = `<main class="min-h-screen flex items-center justify-center bg-neutral-950 px-4"><div class="w-full max-w-md">
@@ -135,17 +154,17 @@
         const cfg = RESOURCES[resource];
         html = `<main class="min-h-screen flex items-center justify-center bg-neutral-950 px-4"><div class="w-full max-w-sm">
           <div class="flex flex-col items-center mb-8">
-            <div class="w-14 h-14 rounded-2xl bg-neutral-800 flex items-center justify-center mb-4"><i data-lucide="lock" class="w-6 h-6 text-neutral-300"></i></div>
+            <div class="w-14 h-14 rounded-2xl bg-neutral-800 flex items-center justify-center mb-4"><i data-lucide="lock" class="w-6 h-6 accent-text"></i></div>
             <h1 class="text-xl font-semibold text-white text-center">${esc(cfg.title)}</h1>
             <p class="text-sm text-neutral-400 mt-2 text-center">${esc(cfg.prompt)}</p>
           </div>
           <form onsubmit="handleLogin(event)" class="space-y-4">
             <input type="password" value="${esc(password)}" oninput="password=this.value" placeholder="访问密码" autofocus class="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400 transition-colors"/>
             ${error ? `<p class="text-sm text-red-400">${esc(error)}</p>` : ""}
-            <button type="submit" ${loading || fetching ? "disabled" : ""} class="w-full py-3 rounded-xl bg-white text-neutral-900 font-medium hover:bg-neutral-200 disabled:opacity-50 transition-colors">${loading || fetching ? "验证中..." : "进入"}</button>
+            <button type="submit" ${loading || fetching ? "disabled" : ""} class="w-full py-3 rounded-xl accent-btn text-white font-medium disabled:opacity-50 transition-colors">${loading || fetching ? "验证中..." : "进入"}</button>
           </form>
           <div class="mt-6 w-full text-center space-y-3">
-            <a href="${esc(cfg.link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300">${esc(cfg.linkText)} <i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>
+            <a href="${esc(cfg.link)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-sm accent-text">${esc(cfg.linkText)} <i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>
             <div class="flex justify-center"><img src="${esc(cfg.qr)}" alt="${esc(cfg.qrAlt)}" class="w-40 h-40 rounded-xl border border-neutral-800 bg-white p-1"/></div>
           </div>
           <button onclick="back()" class="mt-4 w-full text-center text-xs text-neutral-500 hover:text-neutral-300 transition-colors">返回，选择其他账号</button>
@@ -158,28 +177,28 @@
         const itemHtml = (item) => `<div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
               <div class="flex items-start justify-between gap-3">
                 <div class="flex items-center gap-2 min-w-0">
-                  ${item.type === "link" ? '<i data-lucide="link" class="w-4 h-4 text-blue-400 shrink-0"></i>' : '<i data-lucide="file-text" class="w-4 h-4 text-emerald-400 shrink-0"></i>'}
+                  ${item.type === "link" ? '<i data-lucide="link" class="w-4 h-4 accent-text shrink-0"></i>' : '<i data-lucide="file-text" class="w-4 h-4 accent-text shrink-0"></i>'}
                   <h2 class="font-medium truncate">${esc(item.title)}</h2>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                  <button type="button" onclick="copyItem('${esc(item.id)}')" class="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-white transition-colors">${copiedId === item.id ? "已复制" : '<i data-lucide="copy" class="w-3.5 h-3.5"></i> 复制'}</button>
+                  <button type="button" onclick="copyItem('${esc(item.id)}')" class="inline-flex items-center gap-1 text-xs text-neutral-400 accent-text-hover transition-colors">${copiedId === item.id ? "已复制" : '<i data-lucide="copy" class="w-3.5 h-3.5"></i> 复制'}</button>
                   <span class="text-xs text-neutral-500">${fmtDate(item.createdAt)}</span>
                 </div>
               </div>
               ${item.content ? `<p class="mt-3 text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed">${esc(item.content)}</p>` : ""}
-              ${item.type === "link" && item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 break-all">${esc(item.url)} <i data-lucide="external-link" class="w-3.5 h-3.5 shrink-0"></i></a>` : ""}
+              ${item.type === "link" && item.url ? `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center gap-1.5 text-sm accent-text break-all">${esc(item.url)} <i data-lucide="external-link" class="w-3.5 h-3.5 shrink-0"></i></a>` : ""}
             </div>`;
         html = `<main class="min-h-screen bg-neutral-950 text-white">
           <header class="border-b border-neutral-800"><div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-            <h1 class="text-lg font-semibold">${esc(cfg.title)}</h1>
-            <button onclick="back()" class="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</button>
+            <div class="flex items-center gap-2"><span class="w-1.5 h-5 rounded accent-bar"></span><h1 class="text-lg font-semibold">${esc(cfg.title)}</h1></div>
+            <button onclick="back()" class="flex items-center gap-1.5 text-sm text-neutral-400 accent-text-hover transition-colors"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</button>
           </div></header>
           <div class="max-w-2xl mx-auto px-4 py-8 space-y-4">
             ${items.length === 0 ? '<p class="text-center text-neutral-500 py-16">暂无分享内容</p>' : `${pageItems.map(itemHtml).join("")}
             <div class="flex items-center justify-between pt-2">
-              <button onclick="changePage(-1)" ${page <= 1 ? "disabled" : ""} class="px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-neutral-300 hover:border-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">上一页</button>
+              <button onclick="changePage(-1)" ${page <= 1 ? "disabled" : ""} class="px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-neutral-300 accent-hoverable disabled:opacity-40 disabled:cursor-not-allowed transition-colors">上一页</button>
               <span class="text-xs text-neutral-500">第 ${page} / ${totalPages} 页 · 共 ${items.length} 条</span>
-              <button onclick="changePage(1)" ${page >= totalPages ? "disabled" : ""} class="px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-neutral-300 hover:border-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">下一页</button>
+              <button onclick="changePage(1)" ${page >= totalPages ? "disabled" : ""} class="px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-neutral-300 accent-hoverable disabled:opacity-40 disabled:cursor-not-allowed transition-colors">下一页</button>
             </div>`}
           </div>
         </main>`;
