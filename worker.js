@@ -211,39 +211,39 @@ export default {
         return json({ error: "缺少密码字段" }, 400)
       }
 
-      // GET /api/admin/export —— 导出全部数据（密码 + 各资源内容），不含会话令牌
+      // GET /api/admin/export —— 仅导出各资源的分享内容，不含任何密码与会话令牌
       if (path === "/api/admin/export" && method === "GET") {
         if (!(await requireAdmin(request, db)))
           return json({ error: "未授权" }, 401)
-        const passwords = await getKV(db, "passwords")
         const res = {}
         for (const id of ["1", "2"]) {
-          res[id] = await getResource(db, id)
+          const r = await getResource(db, id)
+          res[id] = { content: r.content || [] }
         }
         return json({
           version: 1,
+          type: "content-only",
           exportedAt: Date.now(),
-          data: { passwords, res },
+          data: { res },
         })
       }
 
-      // POST /api/admin/import —— 用备份文件覆盖数据（密码 + 各资源内容），不改动会话令牌
+      // POST /api/admin/import —— 用备份文件覆盖各资源的分享内容，不改动任何密码与会话令牌
       if (path === "/api/admin/import" && method === "POST") {
         if (!(await requireAdmin(request, db)))
           return json({ error: "未授权" }, 401)
         if (!body || typeof body !== "object" || !body.data || typeof body.data !== "object")
           return json({ error: "文件格式不正确" }, 400)
         const data = body.data
-        if (data.passwords && typeof data.passwords === "object") {
-          await setKV(db, "passwords", data.passwords)
-        }
-        if (data.res && typeof data.res === "object") {
-          for (const id of Object.keys(data.res)) {
-            if (!/^\d+$/.test(id)) continue
-            if (data.res[id] && typeof data.res[id] === "object") {
-              await setKV(db, `res:${id}`, data.res[id])
-            }
-          }
+        if (!data.res || typeof data.res !== "object")
+          return json({ error: "文件格式不正确（缺少 res）" }, 400)
+        for (const id of Object.keys(data.res)) {
+          if (!/^\d+$/.test(id)) continue
+          const src = data.res[id]
+          if (!src || typeof src !== "object") continue
+          const r = await getResource(db, id) // 保留该资源现有访问密码
+          r.content = Array.isArray(src.content) ? src.content : []
+          await setKV(db, `res:${id}`, r)
         }
         return json({ ok: true })
       }
