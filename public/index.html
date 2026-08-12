@@ -46,7 +46,7 @@
         const res = await fetch("/api/content?resource=" + resId, { headers: { "X-Access-Code": code } });
         if (res.ok) {
           const data = await res.json();
-          items = data.items || [];
+          items = (data.items || []).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
           authed = true;
           page = 1;
           sessionStorage.setItem("share_access", JSON.stringify({ resource: resId, code }));
