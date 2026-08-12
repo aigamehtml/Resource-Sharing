@@ -94,8 +94,17 @@ export default {
       return new Response(null, { status: 204, headers: CORS })
     }
 
-    // 非 /api/* 一律交给静态资源（同源，不存在 CORS 问题）
+    // 非 /api/* 交给静态资源（同源，不存在 CORS 问题）
+    // html_handling=none 下目录索引不会自动补全，这里手动把 / 与 /admin/ 重写为 index.html
     if (!path.startsWith("/api/")) {
+      let assetPath = path
+      if (path === "/" || path === "") assetPath = "/index.html"
+      else if (path === "/admin" || path === "/admin/") assetPath = "/admin/index.html"
+      if (assetPath !== path) {
+        const u = new URL(request.url)
+        u.pathname = assetPath
+        return env.ASSETS.fetch(new Request(u.toString(), request))
+      }
       return env.ASSETS.fetch(request)
     }
 
