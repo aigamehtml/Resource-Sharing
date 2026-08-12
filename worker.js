@@ -142,14 +142,14 @@ export default {
         const access = header(request, "x-access-code")
         const admin = header(request, "x-admin-code")
         const r = await getResource(db, rid)
-        if (await requireAdmin(req, db)) return json({ items: r.content || [] })
+        if (await requireAdmin(request, db)) return json({ items: r.content || [] })
         if (access === r.accessPassword) return json({ items: r.content || [] })
         return json({ error: "密码错误" }, 401)
       }
 
       // POST /api/admin/content  (新增)
       if (path === "/api/admin/content" && method === "POST") {
-        if (!(await requireAdmin(req, db)))
+        if (!(await requireAdmin(request, db)))
           return json({ error: "未授权" }, 401)
         const r = await getResource(db, rid)
         const item = {
@@ -169,7 +169,7 @@ export default {
 
       // POST /api/admin/content/delete
       if (path === "/api/admin/content/delete" && method === "POST") {
-        if (!(await requireAdmin(req, db)))
+        if (!(await requireAdmin(request, db)))
           return json({ error: "未授权" }, 401)
         const r = await getResource(db, rid)
         r.content = (r.content || []).filter((it) => it.id !== body.id)
@@ -179,9 +179,10 @@ export default {
 
       // POST /api/admin/password
       if (path === "/api/admin/password" && method === "POST") {
-        if (!(await requireAdmin(req, db)))
+        if (!(await requireAdmin(request, db)))
           return json({ error: "未授权" }, 401)
         if (body.adminPassword != null) {
+          const p = await getPasswords(db)
           const v = String(body.adminPassword)
           if (v.length < 6) return json({ error: "管理密码至少 6 位" }, 400)
           p.adminPassword = v
